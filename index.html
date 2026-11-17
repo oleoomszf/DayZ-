@@ -30,6 +30,7 @@
 
   <div id="ammo-box">Munição: <span id="ammo">12 / 0</span></div>
   <div id="kills-box">Abates: <span id="kills">0</span></div>
+  <div id="online-count">Online: 0</div>
 
   <div id="inventory" class="hidden">
     <h2>Inventário</h2>
@@ -44,6 +45,9 @@
   <div id="start" class="overlay">
     <div class="panel">
       <h1>Sobrevivência</h1>
+      <label class="name-label" for="player-name">Nome do jogador</label>
+      <input id="player-name" maxlength="18" placeholder="Seu nome" value="Sobrevivente" autocomplete="nickname">
+      <p id="network-status" role="status">Aguardando conexão com o servidor...</p>
       <p>WASD mover · Shift correr · Espaço pular · Mouse olhar<br>
          Clique atirar (ou golpear sem munição) · E pegar · TAB inventário · 1/2/3 usar · R recarregar</p>
       <button id="start-btn">Jogar</button>

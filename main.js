@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { io } from 'https://cdn.socket.io/4.8.1/socket.io.esm.min.js';
+import { SERVER_URL } from './server-config.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -445,6 +447,104 @@ flash.visible = false;
 pistol.group.add(flash);
 
 const controls = new PointerLockControls(camera, document.body);
+
+/* ===========================================================
+   MULTIPLAYER: os jogadores remotos são recebidos do servidor
+   =========================================================== */
+const socket = io(SERVER_URL, { autoConnect: false, transports: ['websocket', 'polling'] });
+const remotePlayers = new Map();
+let networkReady = false;
+let networkSendTimer = 0;
+let playerName = 'Sobrevivente';
+
+function makeNameTag(name) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(0,0,0,0.68)';
+  ctx.beginPath(); ctx.roundRect(4, 4, 248, 56, 12); ctx.fill();
+  ctx.font = 'bold 28px system-ui'; ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffffff'; ctx.fillText(String(name).slice(0, 18), 128, 41);
+  const texture = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false }));
+  sprite.scale.set(1.8, 0.45, 1);
+  sprite.position.y = 2.15;
+  return sprite;
+}
+
+function createRemotePlayer(data) {
+  const root = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3d7cbd, roughness: 0.85 });
+  const skinMat = new THREE.MeshStandardMaterial({ color: 0xc99b78, roughness: 0.9 });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.25, 0.55, 4, 8), bodyMat);
+  body.position.y = 0.78; body.castShadow = true;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.19, 12, 10), skinMat);
+  head.position.y = 1.48; head.castShadow = true;
+  root.add(body, head, makeNameTag(data.name));
+  root.position.set(data.x || 0, 0, data.z || 0);
+  root.rotation.y = data.yaw || 0;
+  scene.add(root);
+  return { root, target: new THREE.Vector3(data.x || 0, 0, data.z || 0), yaw: data.yaw || 0, name: data.name };
+}
+
+function applyPlayersSnapshot(players) {
+  const incoming = new Set();
+  for (const p of players || []) {
+    if (!p || p.id === socket.id) continue;
+    incoming.add(p.id);
+    let remote = remotePlayers.get(p.id);
+    if (!remote) { remote = createRemotePlayer(p); remotePlayers.set(p.id, remote); }
+    remote.name = p.name;
+    remote.target.set(p.x, 0, p.z);
+    remote.yaw = p.yaw;
+  }
+  for (const [id, remote] of remotePlayers) {
+    if (!incoming.has(id)) { scene.remove(remote.root); remote.root.traverse(o => { if (o.material) o.material.dispose(); }); remotePlayers.delete(id); }
+  }
+  const count = (players || []).length;
+  const label = $('online-count');
+  if (label) label.textContent = `Online: ${count}`;
+}
+
+socket.on('connect', () => {
+  networkReady = true;
+  socket.emit('player:join', { name: playerName, x: camera.position.x, z: camera.position.z, yaw: camera.rotation.y });
+  $('network-status').textContent = 'Conectado ao servidor';
+  $('network-status').classList.add('connected');
+  toast('Conectado ao multiplayer!');
+  controls.lock();
+});
+socket.on('connect_error', () => {
+  networkReady = false;
+  $('network-status').textContent = 'Não foi possível conectar. Confira o endereço do servidor.';
+});
+socket.on('players:update', applyPlayersSnapshot);
+socket.on('player:left', ({ id }) => {
+  const remote = remotePlayers.get(id);
+  if (remote) { scene.remove(remote.root); remotePlayers.delete(id); }
+});
+socket.on('server:message', (message) => toast(message));
+
+function sendPlayerState(dt) {
+  if (!networkReady || !socket.connected) return;
+  networkSendTimer += dt;
+  if (networkSendTimer < 0.05) return;
+  networkSendTimer = 0;
+  socket.emit('player:update', {
+    x: camera.position.x, y: camera.position.y, z: camera.position.z,
+    yaw: camera.rotation.y, pitch: camera.rotation.x,
+    moving: !!(keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD),
+  });
+}
+
+function updateRemotePlayers(dt) {
+  for (const remote of remotePlayers.values()) {
+    remote.root.position.lerp(remote.target, Math.min(1, dt * 12));
+    const diff = Math.atan2(Math.sin(remote.yaw - remote.root.rotation.y), Math.cos(remote.yaw - remote.root.rotation.y));
+    remote.root.rotation.y += diff * Math.min(1, dt * 12);
+  }
+}
+
 const keys = {};
 const items = { food: 0, water: 0, bandage: 0, ammo: 0, wood: 3 };   // ammo = reserva
 const ray = new THREE.Raycaster();
@@ -819,7 +919,15 @@ controls.addEventListener('lock', () => $('start').classList.add('hidden'));
 controls.addEventListener('unlock', () => {
   if (!dead && !invOpen) $('start').classList.remove('hidden');
 });
-$('start-btn').addEventListener('click', () => controls.lock());
+$('start-btn').addEventListener('click', () => {
+  const input = $('player-name');
+  playerName = (input?.value || 'Sobrevivente').trim().slice(0, 18) || 'Sobrevivente';
+  $('start-btn').disabled = true;
+  $('network-status').textContent = 'Conectando ao servidor...';
+  if (socket.connected) { controls.lock(); return; }
+  socket.connect();
+  setTimeout(() => { if (!networkReady) $('start-btn').disabled = false; }, 5000);
+});
 $('restart').addEventListener('click', () => location.reload());
 
 document.addEventListener('mousedown', (e) => {
@@ -840,6 +948,8 @@ document.addEventListener('keydown', (e) => {
 });
 document.addEventListener('keyup', (e) => { keys[e.code] = false; });
 
+window.addEventListener('beforeunload', () => { if (socket.connected) socket.disconnect(); });
+
 window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
@@ -859,6 +969,8 @@ renderer.setAnimationLoop(() => {
   gameTime += dt;
 
   const moving = dead ? false : updatePlayer(dt);
+  sendPlayerState(dt);
+  updateRemotePlayers(dt);
   if (!dead) updateSurvival(dt);
   updateFirstPerson(dt, moving);
   updateWeapon(dt, moving);

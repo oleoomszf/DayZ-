@@ -154,3 +154,18 @@ button {
   cursor: pointer;
 }
 button:hover { background: #d1573a; }
+
+#online-count {
+  position: fixed; top: 20px; left: 20px; z-index: 2;
+  background: rgba(0,0,0,.55); padding: 8px 12px; border-radius: 6px;
+  font-size: 14px; pointer-events: none;
+}
+.name-label { display:block; margin: 12px 0 5px; font-size:14px; color:#ddd; }
+#player-name {
+  display:block; width:min(280px, 80vw); margin:0 auto; padding:11px 12px;
+  border:1px solid #555; border-radius:6px; background:#171717; color:#fff;
+  font:inherit; text-align:center;
+}
+#network-status { min-height:22px; color:#ffc36b; font-size:13px; margin:10px 0 0; }
+#network-status.connected { color:#8ee6a0; }
+button:disabled { opacity:.6; cursor:wait; }
