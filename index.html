@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sobrevivência Pós-Apocalipse</title>
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="damage"></div>
+  <div id="crosshair"></div>
+  <div id="prompt"></div>
+  <div id="toast"></div>
+
+  <div id="hud">
+    <div class="bar"><span>VIDA</span><div><i id="bar-health" class="health"></i></div></div>
+    <div class="bar"><span>ESTAMINA</span><div><i id="bar-stamina" class="stamina"></i></div></div>
+    <div class="bar"><span>FOME</span><div><i id="bar-hunger" class="hunger"></i></div></div>
+    <div class="bar"><span>SEDE</span><div><i id="bar-thirst" class="thirst"></i></div></div>
+    <div class="bar"><span>TEMPERATURA</span><div><i id="bar-temp" class="temp"></i></div></div>
+  </div>
+
+  <div id="ammo-box">Munição: <span id="ammo">12 / 0</span></div>
+  <div id="kills-box">Abates: <span id="kills">0</span></div>
+
+  <div id="inventory" class="hidden">
+    <h2>Inventário</h2>
+    <p>1 — Comer lata de feijão: <b id="inv-food">0</b></p>
+    <p>2 — Beber água: <b id="inv-water">0</b></p>
+    <p>3 — Usar bandagem: <b id="inv-bandage">0</b></p>
+    <p>R — Recarregar (reserva): <b id="inv-ammo">0</b></p>
+    <p>F — Acender fogueira (madeira): <b id="inv-wood">0</b></p>
+    <p class="hint">Mire no item e aperte E para pegar. TAB para fechar.</p>
+  </div>
+
+  <div id="start" class="overlay">
+    <div class="panel">
+      <h1>Sobrevivência</h1>
+      <p>WASD mover · Shift correr · Espaço pular · Mouse olhar<br>
+         Clique atirar (ou golpear sem munição) · E pegar · TAB inventário · 1/2/3 usar · R recarregar</p>
+      <button id="start-btn">Jogar</button>
+    </div>
+  </div>
+
+  <div id="death" class="overlay hidden">
+    <div class="panel">
+      <h1>Você morreu</h1>
+      <button id="restart">Jogar de novo</button>
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
